@@ -4,7 +4,7 @@ module TB3();
     always
         #10 clk = ~clk;
     initial begin
-        rst = 1;
+        #5 rst = 1;
         #20 rst = 0;
         #10000 $stop;
     end

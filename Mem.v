@@ -10,11 +10,9 @@ module Mem(clk, rst, a, we, wd, out);
     always @(address, posedge clk, posedge rst)begin
         if (rst)
             $readmemb("C:/Users/AliGH/Desktop/ca3/testArray.txt", mem);
-        else begin
-            out = mem[address>>2];
-            if (clk & we)
-                mem[address>>2] = wd;
-        end
+        out = mem[address>>2];
+        if (we)
+            mem[address>>2] = wd;
     end
 endmodule
 

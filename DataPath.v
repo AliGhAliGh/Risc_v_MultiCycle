@@ -23,9 +23,9 @@ module DataPath(PcEn, AdrSrc, MemWrite, IrWrite, RegWrite, Immsrc, AluSrcA, AluS
     Reg B(.clk(clk),.rst(rst),.inp(Rd2),.out(RegB));
     always @(posedge rst, posedge clk) begin
         if(rst)
-            SignBitReg = 1'b0;
+            SignBitReg <= 1'b0;
         else
-            SignBitReg = SignBitOut;
+            SignBitReg <= SignBitOut;
     end
     Reg AluOutReg(.clk(clk),.rst(rst),.inp(AluOut),.out(AluOutRegOut));
     Reg MDR(.clk(clk),.rst(rst),.inp(MemOut),.out(MdrRegOut));
