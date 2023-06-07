@@ -2,7 +2,7 @@ module Alu(Op, a, b, out , Zero, SignBit);
     input [2:0] Op;
     input [31:0] a, b;
     output reg [31:0] out;
-    output Zero;
+    output Zero, SignBit;
     assign Zero = (out == 32'b0);
     assign SignBit = out[31];
     always @(Op, a, b)begin

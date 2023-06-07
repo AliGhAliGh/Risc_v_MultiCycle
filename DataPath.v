@@ -5,12 +5,12 @@ module DataPath(PcEn, AdrSrc, MemWrite, IrWrite, RegWrite, Immsrc, AluSrcA, AluS
     output Zero, SignBit;
     wire[31:0] PcOut, MemAdr, MemOut, Inst, OldPcOut, Rd1, Rd2, ImmOut, RegA, RegB, AluInA, AluInB, AluOut, AluOutRegOut, MdrRegOut, ResultOut, RegData, SignBitRegOut;
     Mux2 AdrSrcMux(PcOut, ResultOut, AdrSrc, MemAdr);
-    Mux4 AdrSrcMux(ResultOut, AluOutRegOut, ImmOut, SignBitRegOut, RegDataSel, RegData);
+    Mux4 RegDataMux(ResultOut, AluOutRegOut, ImmOut, SignBitRegOut, RegDataSel, RegData);
     Mux4 AluSrcMuxA(PcOut, OldPcOut, RegA, 32'b0, AluSrcA, AluInA);
     Mux4 AluSrcMuxB(RegB, ImmOut, {29'b0, 3'b100}, 32'b0, AluSrcB, AluInB);
     Mux4 ResultSrcMux(AluOutRegOut, MdrRegOut, AluOut, 32'b0, ResultSrc, ResultOut);
     Alu alu(.op(AluOp),.a(AluInA),.b(AluInB),.out(AluOut),.Zero(Zero),.SignBit(SignBit));
-    RegMem regmem(.clk(clk),.rst(rst),we(RegWrite),.a1(Inst[19:15]),.a2(Inst[24:20]),.a3(Inst[11:7]),.wd(RegData),.rd1(Rd1),.rd2(Rd2));
+    RegMem regmem(.clk(clk),.rst(rst),.we(RegWrite),.a1(Inst[19:15]),.a2(Inst[24:20]),.a3(Inst[11:7]),.wd(RegData),.rd1(Rd1),.rd2(Rd2));
     Reg A(.clk(clk),.rst(rst),.inp(Rd1),.out(RegA));
     Reg B(.clk(clk),.rst(rst),.inp(Rd2),.out(RegB));
     Reg SignBitReg(.clk(clk),.rst(rst),.inp(SignBit),.out(SignBitRegOut));
