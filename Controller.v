@@ -22,11 +22,11 @@ module Controller(Zero, SignBit, Op, F3, F7, PcEn, AdrSrc, MemWrite, IrWrite, Re
     input Zero, SignBit, clk, rst;
     input[6:0] Op,F7;
     input[2:0] F3;
-    output reg AdrSrc, MemWrite, IrWrite, RegWrite, RegDataSel;
+    output reg AdrSrc, MemWrite, IrWrite, RegWrite;
     output PcEn;
     output reg[2:0] Immsrc;
     output[2:0] AluIn;
-    output reg[1:0] ResultSrc, AluSrcA, AluSrcB;
+    output reg[1:0] ResultSrc, AluSrcA, AluSrcB, RegDataSel;
     reg[2:0] ns, ps, AluOp;
     reg PcUpdate;
     wire IsIType, IsJalr, IsSlt, IsSltI;
@@ -52,7 +52,7 @@ module Controller(Zero, SignBit, Op, F3, F7, PcEn, AdrSrc, MemWrite, IrWrite, Re
             MEMORY_ACCESS: ns = Op == LW_OP ? WRITE_BACK : Op == SW_OP ? InstructionFetch : BUG;
         endcase
     end
-    always @(ns) begin
+    always @(ns, Op, IsIType, F3, IsJalr, IsSltI, IsSlt) begin
         {AdrSrc, MemWrite, IrWrite, RegWrite, RegDataSel, AluOp, Immsrc, ResultSrc, AluSrcA, AluSrcB, PcUpdate} = 18'b0;
         case (ns)
         InstructionFetch: begin
