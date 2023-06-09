@@ -1,4 +1,4 @@
-module Controller(Zero, SignBit, Op, F3, F7, PcEn, AdrSrc, MemWrite, IrWrite, RegWrite, Immsrc, AluSrcA, AluSrcB, AluIn, ResultSrc, RegDataSel, clk, rst);
+module Controller(Zero, SignBit, Op, F3, F7, PcEn, AdrSrc, MemWrite, IrWrite, RegWrite, Immsrc, AluSrcA, AluSrcB, AluIn, ResultSrc, RDS, clk, rst);
     parameter ADD_I_3 = 3'b0;
     parameter XOR_I_3 = 3'b100;
     parameter OR_I_3 = 3'b110;
@@ -13,12 +13,22 @@ module Controller(Zero, SignBit, Op, F3, F7, PcEn, AdrSrc, MemWrite, IrWrite, Re
     parameter JAL_OP =7'b1101111;
     parameter SLT_7 = 7'b0;
     parameter SLT_3 = 3'b010;
-    parameter InstructionFetch = 3'b0;
-    parameter InstructionDecode = 3'b001;
-    parameter EXECUTION = 3'b010;
-    parameter MEMORY_ACCESS = 3'b011;
-    parameter WRITE_BACK = 3'b100;
-    parameter BUG = 3'b101;
+    parameter InstructionFetch = 4'b0;
+    parameter InstructionDecode = 4'b0001;
+    parameter EXECUTION_R = 4'b0010;
+    parameter EXECUTION_L = 4'b0011;
+    parameter EXECUTION_S = 4'b0100;
+    parameter EXECUTION_I = 4'b0101;
+    parameter EXECUTION_J = 4'b0110;
+    parameter EXECUTION_B = 4'b0111;
+    parameter MEMORY_ACCESS_L = 4'b1000;
+    parameter MEMORY_ACCESS_S = 4'b1001;
+    parameter WRITE_BACK_R = 4'b1010;
+    parameter WRITE_BACK_L = 4'b1011;
+    parameter WRITE_BACK_I = 4'b1100;
+    parameter WRITE_BACK_J = 4'b1101;
+    parameter WRITE_BACK_U = 4'b1110;
+    parameter BUG = 4'b1111;
     input Zero, SignBit, clk, rst;
     input[6:0] Op,F7;
     input[2:0] F3;
@@ -26,8 +36,9 @@ module Controller(Zero, SignBit, Op, F3, F7, PcEn, AdrSrc, MemWrite, IrWrite, Re
     output PcEn;
     output reg[2:0] Immsrc;
     output[2:0] AluIn;
-    output reg[1:0] ResultSrc, AluSrcA, AluSrcB, RegDataSel;
-    reg[2:0] ns, ps, AluOp;
+    output reg[1:0] ResultSrc, AluSrcA, AluSrcB, RDS;
+    reg[2:0] AluOp;
+    reg[3:0] ns, ps;
     reg PcUpdate;
     wire IsIType, IsJalr, IsSlt, IsSltI;
     assign IsSlt = Op == R_TYPE_OP & F3 == SLT_3 & F7 == SLT_7;
@@ -45,48 +56,99 @@ module Controller(Zero, SignBit, Op, F3, F7, PcEn, AdrSrc, MemWrite, IrWrite, Re
         case (ps)
             BUG: ns = BUG;
             InstructionFetch: ns <= InstructionDecode;
-            InstructionDecode: ns <= Op == LU_I_OP ? WRITE_BACK : EXECUTION;
-            EXECUTION: ns <= Op == R_TYPE_OP | Op == I_TYPE_ARITHMATIC_OP ? WRITE_BACK :
-                        Op == LW_OP | Op == SW_OP ? MEMORY_ACCESS :
-                        Op == B_TYPE_OP | Op == JAL_OP | IsJalr ? InstructionFetch : BUG;
-            WRITE_BACK: ns <= InstructionFetch;
-            MEMORY_ACCESS: ns <= Op == LW_OP ? WRITE_BACK : Op == SW_OP ? InstructionFetch : BUG;
+            InstructionDecode: ns <= Op == R_TYPE_OP ? EXECUTION_R : 
+                                Op == LW_OP ? EXECUTION_L :
+                                Op == SW_OP ? EXECUTION_S :
+                                Op == I_TYPE_ARITHMATIC_OP ? EXECUTION_I :
+                                Op == B_TYPE_OP ? EXECUTION_B :
+                                Op == LU_I_OP ? WRITE_BACK_U :
+                                Op == JAL_OP | IsJalr ? EXECUTION_J : BUG;
+            EXECUTION_B: ns <= InstructionFetch;
+            EXECUTION_R: ns <= WRITE_BACK_R;
+            EXECUTION_I: ns <= WRITE_BACK_I;
+            EXECUTION_J: ns <= WRITE_BACK_J;
+            EXECUTION_L: ns <= MEMORY_ACCESS_L;
+            EXECUTION_S: ns <= MEMORY_ACCESS_S;
+            WRITE_BACK_R: ns <= InstructionFetch;
+            WRITE_BACK_I: ns <= InstructionFetch;
+            WRITE_BACK_J: ns <= InstructionFetch;
+            WRITE_BACK_L: ns <= InstructionFetch;
+            WRITE_BACK_U: ns <= InstructionFetch;
+            MEMORY_ACCESS_L: ns <= WRITE_BACK_L;
+            MEMORY_ACCESS_S: ns <= InstructionFetch;
         endcase
     end
     always @(ps, Op, IsIType, F3, IsJalr, IsSltI, IsSlt) begin
-        {AdrSrc, MemWrite, IrWrite, RegWrite, RegDataSel, AluOp, Immsrc, ResultSrc, AluSrcA, AluSrcB, PcUpdate} = 18'b0;
+        {AdrSrc, MemWrite, IrWrite, RegWrite, RDS, AluOp, Immsrc, ResultSrc, AluSrcA, AluSrcB, PcUpdate} = 18'b0;
         case (ps)
         InstructionFetch: begin
             IrWrite <= 1'b1;
             AluSrcB <= 2'b10;
             ResultSrc <= 2'b10;
-            PcUpdate <= 1;
+            PcUpdate <= 1'b1;
         end
         InstructionDecode: begin
             AluSrcA <= 2'b01;
-            AluSrcB <= Op == JAL_OP | IsJalr ? 2'b10 : 2'b01;
-            Immsrc <= Op == JAL_OP ? 3'b011 : IsIType ? 3'b0 : 3'b010;
+            AluSrcB <= 2'b01;
+            Immsrc <= 3'b010;
         end
-        EXECUTION: begin
-            Immsrc <= IsIType ? 3'b000 : Op == SW_OP ? 3'b001 : Op == B_TYPE_OP ? 3'b010 :
-                    Op == JAL_OP ? 3'b011 : Op == LU_I_OP ? 3'b100 : 3'b101;
-            AluSrcA <= Op == R_TYPE_OP | IsIType | Op == SW_OP | Op == B_TYPE_OP ? 2'b10 : 2'b01;
-            AluSrcB <= Op == R_TYPE_OP | Op == B_TYPE_OP ? 2'b0 : 2'b01;  
-            AluOp <= Op == R_TYPE_OP ? 3'b010 : (Op == LW_OP | (Op == I_TYPE_ARITHMATIC_OP & F3 == ADD_I_3) | IsJalr | Op == JAL_OP | Op == SW_OP) ? 3'b000 : 
-                    (IsSltI | Op == B_TYPE_OP) ? 3'b001 : Op == I_TYPE_ARITHMATIC_OP ? 3'b100 : 3'b111;
-            ResultSrc <= IsJalr | Op == JAL_OP ? 2'b10 : 2'b0;
-            RegWrite <= IsJalr | Op == JAL_OP;
-            PcUpdate <= IsJalr | Op == JAL_OP;
-            RegDataSel <= 2'b01;
+        EXECUTION_R: begin
+            AluSrcA = 2'b10;
+            AluOp = 3'b010;
         end
-        MEMORY_ACCESS: begin
-            AdrSrc <= 1'b1;
-            MemWrite <= Op == SW_OP;
+        EXECUTION_L: begin
+            AluSrcA = 2'b10;
+            AluSrcB = 2'b01;
         end
-        WRITE_BACK: begin
-            RegWrite <= 1'b1;
-            RegDataSel <= Op == LU_I_OP ? 2'b10 : IsSlt | IsSltI ? 2'b11 : 2'b0;
-            ResultSrc <= Op == LW_OP ? 2'b01 : 2'b0;
+        EXECUTION_S: begin
+            AluSrcA = 2'b10;
+            AluSrcB = 2'b01;
+            Immsrc = 3'b001;
+        end
+        EXECUTION_I: begin
+            AluSrcA = 2'b10;
+            AluSrcB = 2'b01;
+        end
+        EXECUTION_B: begin
+            AluSrcA = 2'b10;
+            AluOp = 3'b001;
+        end
+        EXECUTION_J: begin
+            AluSrcA = 2'b01;
+            AluSrcB = 2'b10;
+        end
+        WRITE_BACK_R: begin
+            RegWrite = 1'b1;
+            ResultSrc = IsSlt ? 2'b11 : 2'b0;
+        end
+        WRITE_BACK_I: begin
+            RegWrite = 1'b1;
+            ResultSrc = IsSltI ? 2'b11 : 2'b0;
+        end
+        WRITE_BACK_U: begin
+            Immsrc = 3'b100;
+            RegWrite = 1'b1;
+            RDS = 2'b01;
+        end
+        WRITE_BACK_L: begin
+            RegWrite = 1'b1;
+            ResultSrc = 2'b01;
+        end
+        WRITE_BACK_J: begin
+            AluSrcA = IsJalr ? 2'b10 : 2'b01;
+            PcUpdate = 1'b1;
+            RDS = 2'b10;
+            AluSrcB = 2'b01;
+            RegWrite = 1'b1;
+            ResultSrc = 2'b10;
+            Immsrc = IsJalr ? 3'b0 : 3'b011;
+        end
+        MEMORY_ACCESS_L: begin
+            AdrSrc = 1'b1;
+        end
+        MEMORY_ACCESS_S: begin
+            MemWrite = 1'b1;
+            AdrSrc = 1'b1;
         end
        endcase 
     end
@@ -135,5 +197,6 @@ module AluController (AluOp, F3, F7, AluIn);
             (F3 == AND_3 & F7 == AND_7) ? AND :
             (F3 == OR_3 & F7 == OR_7) ? OR :
             (F3 == SLT_3 & F7 == SLT_7) ? SUB : 3'b111) :
-            AluOp == 3'b100 ? ((F3 == XOR_I_3) ? XOR : (F3 == OR_I_3) ? OR : 3'b111) : 3'b111;
+            AluOp == 3'b100 ? ((F3 == XOR_I_3) ? XOR : (F3 == OR_I_3) ? OR :
+            (F3 == ADD_I_3) ? ADD : (F3 == SLT_I_3) ? SUB : 3'b111) : 3'b111;
 endmodule
